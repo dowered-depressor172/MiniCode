@@ -120,7 +120,17 @@ Claude Code’s terminal UI acts as a visualization of internal system state:
 
 MiniCode’s TUI follows the same direction. It renders running tool states, progress messages, approval states, and collapsed tool summaries.
 
-## 10. Boundary Between Borrowing and Simplification
+## 10. Foreground Tool Execution and Background Shell Tasks Are Different
+
+### Claude Code design
+
+Claude Code does not treat every command as the same kind of synchronous tool call. Long-running shell commands that can outlive the current turn are modeled as separate tasks rather than being left hanging as ordinary unfinished tool executions.
+
+### What MiniCode makes visible
+
+MiniCode now follows that direction in a lightweight form. Explicitly backgrounded shell commands are no longer treated as ordinary synchronous `run_command` executions. They are registered as minimal background shell tasks and surfaced separately in the TUI. This is not a full clone of Claude Code’s task system, but it does preserve the design idea that foreground tool execution and background shell tasks should be modeled differently.
+
+## 11. Boundary Between Borrowing and Simplification
 
 ### Claude Code design
 
@@ -138,5 +148,6 @@ MiniCode keeps the structural ideas rather than the full production footprint. W
 - skills as workflow extension
 - automatic context compaction
 - state-oriented terminal UI
+- a distinction between foreground tool execution and background shell tasks
 
 MiniCode is better understood as a small Claude Code-style reference implementation rather than as a full clone.
