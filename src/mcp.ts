@@ -50,7 +50,7 @@ type PendingRequest = {
 export type McpServerSummary = {
   name: string
   command: string
-  status: 'connected' | 'error' | 'disabled'
+  status: 'connecting' | 'connected' | 'error' | 'disabled'
   toolCount: number
   error?: string
   protocol?: JsonRpcProtocol

@@ -81,11 +81,37 @@ type TranscriptEntryDraft =
   | Omit<Extract<TranscriptEntry, { kind: 'tool' }>, 'id'>
 
 function getSessionStats(args: TtyAppArgs, state: ScreenState) {
+  const mcpServers = args.tools.getMcpServers()
+  const mcpConnectedCount = mcpServers.filter(
+    server => server.status === 'connected',
+  ).length
+  const mcpConnectingCount = mcpServers.filter(
+    server => server.status === 'connecting',
+  ).length
+  const mcpErrorCount = mcpServers.filter(server => server.status === 'error').length
   return {
     transcriptCount: state.transcript.length,
     messageCount: args.messages.length,
     skillCount: args.tools.getSkills().length,
-    mcpCount: args.tools.getMcpServers().length,
+    mcpTotalCount: mcpServers.length,
+    mcpConnectedCount,
+    mcpConnectingCount,
+    mcpErrorCount,
+  }
+}
+
+function getMcpStatus(args: TtyAppArgs): {
+  total: number
+  connected: number
+  connecting: number
+  error: number
+} {
+  const mcpServers = args.tools.getMcpServers()
+  return {
+    total: mcpServers.length,
+    connected: mcpServers.filter(server => server.status === 'connected').length,
+    connecting: mcpServers.filter(server => server.status === 'connecting').length,
+    error: mcpServers.filter(server => server.status === 'error').length,
   }
 }
 
@@ -478,6 +504,7 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
         state.status,
         true,
         args.tools.getSkills().length > 0,
+        getMcpStatus(args),
         backgroundTasks,
       ),
     )
@@ -509,6 +536,7 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
       state.status,
       true,
       args.tools.getSkills().length > 0,
+      getMcpStatus(args),
       backgroundTasks,
     ),
   )

@@ -11,7 +11,7 @@ import { maybeHandleManagementCommand } from './manage-cli.js'
 import { MockModelAdapter } from './mock-model.js'
 import { PermissionManager } from './permissions.js'
 import { buildSystemPrompt } from './prompt.js'
-import { createDefaultToolRegistry } from './tools/index.js'
+import { createDefaultToolRegistry, hydrateMcpTools } from './tools/index.js'
 import type { ChatMessage } from './types.js'
 import { renderBanner } from './ui.js'
 import { runTtyApp } from './tty-app.js'
@@ -34,6 +34,13 @@ async function main(): Promise<void> {
   const tools = await createDefaultToolRegistry({
     cwd: process.cwd(),
     runtime,
+  })
+  const mcpHydration = hydrateMcpTools({
+    cwd: process.cwd(),
+    runtime,
+    tools,
+  }).catch(() => {
+    // Keep startup resilient even if some MCP servers fail.
   })
   const permissions = new PermissionManager(process.cwd())
   await permissions.whenReady()
@@ -69,7 +76,16 @@ async function main(): Promise<void> {
         transcriptCount: 0,
         messageCount: messages.length,
         skillCount: tools.getSkills().length,
-        mcpCount: tools.getMcpServers().length,
+        mcpTotalCount: tools.getMcpServers().length,
+        mcpConnectedCount: tools
+          .getMcpServers()
+          .filter(server => server.status === 'connected').length,
+        mcpConnectingCount: tools
+          .getMcpServers()
+          .filter(server => server.status === 'connecting').length,
+        mcpErrorCount: tools
+          .getMcpServers()
+          .filter(server => server.status === 'error').length,
       }),
     )
     console.log('')
@@ -175,6 +191,7 @@ async function main(): Promise<void> {
       // Ignore double-close during EOF teardown.
     }
   } finally {
+    await mcpHydration
     await tools.dispose()
   }
 }
