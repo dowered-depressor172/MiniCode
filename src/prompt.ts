@@ -79,9 +79,26 @@ export async function buildSystemPrompt(
     )
     const connectedServers = mcpServers.filter(server => server.status === 'connected')
     if (connectedServers.length > 0) {
-      parts.push(
-        'Connected MCP tools are already exposed in the tool list with names prefixed like mcp__server__tool. Use list_mcp_resources/read_mcp_resource and list_mcp_prompts/get_mcp_prompt when a server exposes those capabilities.',
+      const hasPublishedResources = connectedServers.some(
+        server => (server.resourceCount ?? 0) > 0,
       )
+      const hasPublishedPrompts = connectedServers.some(
+        server => (server.promptCount ?? 0) > 0,
+      )
+      const capabilityHints = [
+        'Connected MCP tools are already exposed in the tool list with names prefixed like mcp__server__tool. To discover callable MCP integrations, inspect the tool list or use /mcp.',
+      ]
+      if (hasPublishedResources) {
+        capabilityHints.push(
+          'Some connected MCP servers also publish resources, so list_mcp_resources/read_mcp_resource can be useful for reading server-provided content.',
+        )
+      }
+      if (hasPublishedPrompts) {
+        capabilityHints.push(
+          'Some connected MCP servers also publish prompts, so list_mcp_prompts/get_mcp_prompt can be useful for fetching server-provided prompt templates.',
+        )
+      }
+      parts.push(capabilityHints.join(' '))
     }
   }
 

@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { isEnoentError } from './utils/errors.js'
 
 export type SkillSummary = {
   name: string
@@ -209,14 +210,7 @@ export async function removeManagedSkill(args: {
     await rm(targetPath, { recursive: true, force: false })
     return { removed: true, targetPath }
   } catch (error) {
-    const code =
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      typeof error.code === 'string'
-        ? error.code
-        : ''
-    if (code === 'ENOENT') {
+    if (isEnoentError(error)) {
       return { removed: false, targetPath }
     }
     throw error

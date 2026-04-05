@@ -1,6 +1,5 @@
 const RESET = '\u001b[0m'
 const DIM = '\u001b[2m'
-const CYAN = '\u001b[36m'
 const GREEN = '\u001b[32m'
 const YELLOW = '\u001b[33m'
 const BOLD = '\u001b[1m'

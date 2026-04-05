@@ -339,6 +339,7 @@ export function renderFooterBar(
     connected: number
     connecting: number
     error: number
+    toolCount: number
   },
   backgroundTasks: BackgroundTaskResult[] = [],
 ): string {
@@ -353,10 +354,10 @@ export function renderFooterBar(
     mcpStatus.total === 0
       ? `${DIM}mcp${RESET} ${DIM}none${RESET}`
       : mcpStatus.connecting > 0
-        ? `${DIM}mcp${RESET} ${YELLOW}${mcpStatus.connected}/${mcpStatus.total} ready, ${mcpStatus.connecting} connecting${RESET}`
+        ? `${DIM}mcp srv${RESET} ${YELLOW}${mcpStatus.connected}/${mcpStatus.total} ready, ${mcpStatus.connecting} connecting${mcpStatus.toolCount > 0 ? `, ${mcpStatus.toolCount} tools` : ''}${RESET}`
         : mcpStatus.error > 0
-          ? `${DIM}mcp${RESET} ${BRIGHT_RED}${mcpStatus.connected}/${mcpStatus.total} ready, ${mcpStatus.error} err${RESET}`
-          : `${DIM}mcp${RESET} ${GREEN}${mcpStatus.connected}/${mcpStatus.total} ready${RESET}`
+          ? `${DIM}mcp srv${RESET} ${BRIGHT_RED}${mcpStatus.connected}/${mcpStatus.total} ready, ${mcpStatus.error} err${mcpStatus.toolCount > 0 ? `, ${mcpStatus.toolCount} tools` : ''}${RESET}`
+          : `${DIM}mcp srv${RESET} ${GREEN}${mcpStatus.connected}/${mcpStatus.total} ready${mcpStatus.toolCount > 0 ? `, ${mcpStatus.toolCount} tools` : ''}${RESET}`
   const right = `${DIM}tools${RESET} ${toolsEnabled ? `${GREEN}on${RESET}` : `${RED}off${RESET}`} ${DIM}|${RESET} ${DIM}skills${RESET} ${skillsEnabled ? `${GREEN}on${RESET}` : `${RED}off${RESET}`} ${DIM}|${RESET} ${mcpSummary}${backgroundSummary}`
   const gap = Math.max(1, width - stripAnsi(left).length - stripAnsi(right).length)
   return `${left}${' '.repeat(gap)}${right}`

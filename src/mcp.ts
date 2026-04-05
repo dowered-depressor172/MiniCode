@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { readMcpTokensFile } from './config.js'
 import type { McpServerConfig } from './config.js'
 import type { ToolDefinition, ToolResult } from './tool.js'
+import { getErrorCode } from './utils/errors.js'
 
 type JsonRpcMessage = {
   jsonrpc: '2.0'
@@ -75,13 +76,7 @@ function formatChildProcessError(
   stderrLines: string[],
   error: unknown,
 ): Error {
-  const code =
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof error.code === 'string'
-      ? error.code
-      : undefined
+  const code = getErrorCode(error) ?? undefined
   const detail =
     error instanceof Error ? error.message : String(error)
 
@@ -992,6 +987,8 @@ export async function createMcpBackedTools(args: {
   const clientsByServer = new Map<string, McpClientLike>()
   const tools: ToolDefinition<unknown>[] = []
   const servers: McpServerSummary[] = []
+  let hasPublishedResources = false
+  let hasPublishedPrompts = false
 
   for (const [serverName, config] of Object.entries(args.mcpServers)) {
     const endpointKey = `${serverName}::${summarizeServerEndpoint(config)}`
@@ -1035,6 +1032,20 @@ export async function createMcpBackedTools(args: {
     try {
       await client.start()
       const descriptors = await client.listTools()
+      const [resourcesResult, promptsResult] = await Promise.allSettled([
+        client.listResources(),
+        client.listPrompts(),
+      ])
+      const resourceCount =
+        resourcesResult.status === 'fulfilled'
+          ? resourcesResult.value.length
+          : undefined
+      const promptCount =
+        promptsResult.status === 'fulfilled'
+          ? promptsResult.value.length
+          : undefined
+      hasPublishedResources = hasPublishedResources || (resourceCount ?? 0) > 0
+      hasPublishedPrompts = hasPublishedPrompts || (promptCount ?? 0) > 0
       clients.push(client)
       clientsByServer.set(serverName, client)
       const negotiated = client.getProtocol()
@@ -1070,6 +1081,8 @@ export async function createMcpBackedTools(args: {
         command: summarizeServerEndpoint(config),
         status: 'connected',
         toolCount: descriptors.length,
+        resourceCount,
+        promptCount,
         protocol: client.getProtocol() ?? undefined,
       })
     } catch (error) {
@@ -1094,10 +1107,10 @@ export async function createMcpBackedTools(args: {
     })
   }
 
-  if (clientsByServer.size > 0) {
+  if (clientsByServer.size > 0 && hasPublishedResources) {
     tools.push({
       name: 'list_mcp_resources',
-      description: 'List available MCP resources exposed by connected MCP servers.',
+      description: 'List optional MCP resources exposed by connected MCP servers when a server actually publishes them.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1130,14 +1143,17 @@ export async function createMcpBackedTools(args: {
         }
         return {
           ok: true,
-          output: lines.length > 0 ? lines.join('\n') : 'No MCP resources available.',
+          output:
+            lines.length > 0
+              ? lines.join('\n')
+              : 'Connected MCP servers did not publish any MCP resources. This does not mean MCP tools are unavailable.',
         }
       },
     } satisfies ToolDefinition<{ server?: string }>)
 
     tools.push({
       name: 'read_mcp_resource',
-      description: 'Read a specific MCP resource by server and URI.',
+      description: 'Read a specific optional MCP resource by server and URI.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1161,9 +1177,12 @@ export async function createMcpBackedTools(args: {
         return client.readResource(input.uri)
       },
     } satisfies ToolDefinition<{ server: string; uri: string }>)
+  }
+
+  if (clientsByServer.size > 0 && hasPublishedPrompts) {
     tools.push({
       name: 'list_mcp_prompts',
-      description: 'List available MCP prompts exposed by connected MCP servers.',
+      description: 'List optional MCP prompts exposed by connected MCP servers when a server actually publishes them.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1199,14 +1218,17 @@ export async function createMcpBackedTools(args: {
         }
         return {
           ok: true,
-          output: lines.length > 0 ? lines.join('\n') : 'No MCP prompts available.',
+          output:
+            lines.length > 0
+              ? lines.join('\n')
+              : 'Connected MCP servers did not publish any MCP prompts. This does not mean MCP tools are unavailable.',
         }
       },
     } satisfies ToolDefinition<{ server?: string }>)
 
     tools.push({
       name: 'get_mcp_prompt',
-      description: 'Fetch a rendered MCP prompt by server, prompt name, and optional arguments.',
+      description: 'Fetch a rendered optional MCP prompt by server, prompt name, and optional arguments.',
       inputSchema: {
         type: 'object',
         properties: {

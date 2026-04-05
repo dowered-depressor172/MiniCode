@@ -8,6 +8,7 @@ import {
 } from './cli-commands.js'
 import { loadRuntimeConfig } from './config.js'
 import { maybeHandleManagementCommand } from './manage-cli.js'
+import { summarizeMcpServers } from './mcp-status.js'
 import { MockModelAdapter } from './mock-model.js'
 import { PermissionManager } from './permissions.js'
 import { buildSystemPrompt } from './prompt.js'
@@ -18,8 +19,9 @@ import { runTtyApp } from './tty-app.js'
 import { runAgentTurn } from './agent-loop.js'
 
 async function main(): Promise<void> {
+  const cwd = process.cwd()
   const argv = process.argv.slice(2)
-  if (await maybeHandleManagementCommand(process.cwd(), argv)) {
+  if (await maybeHandleManagementCommand(cwd, argv)) {
     return
   }
 
@@ -32,17 +34,17 @@ async function main(): Promise<void> {
   }
 
   const tools = await createDefaultToolRegistry({
-    cwd: process.cwd(),
+    cwd,
     runtime,
   })
   const mcpHydration = hydrateMcpTools({
-    cwd: process.cwd(),
+    cwd,
     runtime,
     tools,
   }).catch(() => {
     // Keep startup resilient even if some MCP servers fail.
   })
-  const permissions = new PermissionManager(process.cwd())
+  const permissions = new PermissionManager(cwd)
   await permissions.whenReady()
   const model =
     process.env.MINI_CODE_MODEL_MODE === 'mock'
@@ -51,12 +53,22 @@ async function main(): Promise<void> {
   let messages: ChatMessage[] = [
     {
       role: 'system',
-      content: await buildSystemPrompt(process.cwd(), permissions.getSummary(), {
+      content: await buildSystemPrompt(cwd, permissions.getSummary(), {
         skills: tools.getSkills(),
         mcpServers: tools.getMcpServers(),
       }),
     },
   ]
+
+  async function refreshSystemPrompt(): Promise<void> {
+    messages[0] = {
+      role: 'system',
+      content: await buildSystemPrompt(cwd, permissions.getSummary(), {
+        skills: tools.getSkills(),
+        mcpServers: tools.getMcpServers(),
+      }),
+    }
+  }
 
   try {
     if (isInteractiveTerminal) {
@@ -65,27 +77,22 @@ async function main(): Promise<void> {
         tools,
         model,
         messages,
-        cwd: process.cwd(),
+        cwd,
         permissions,
       })
       return
     }
 
+    const mcpStatus = summarizeMcpServers(tools.getMcpServers())
     console.log(
-      renderBanner(runtime, process.cwd(), permissions.getSummary(), {
+      renderBanner(runtime, cwd, permissions.getSummary(), {
         transcriptCount: 0,
         messageCount: messages.length,
         skillCount: tools.getSkills().length,
-        mcpTotalCount: tools.getMcpServers().length,
-        mcpConnectedCount: tools
-          .getMcpServers()
-          .filter(server => server.status === 'connected').length,
-        mcpConnectingCount: tools
-          .getMcpServers()
-          .filter(server => server.status === 'connecting').length,
-        mcpErrorCount: tools
-          .getMcpServers()
-          .filter(server => server.status === 'error').length,
+        mcpTotalCount: mcpStatus.total,
+        mcpConnectedCount: mcpStatus.connected,
+        mcpConnectingCount: mcpStatus.connecting,
+        mcpErrorCount: mcpStatus.error,
       }),
     )
     console.log('')
@@ -96,15 +103,9 @@ async function main(): Promise<void> {
       completer: completeSlashCommand,
     })
 
-    if (isInteractiveTerminal) {
-      rl.setPrompt('minicode> ')
-      rl.prompt()
-    }
-
     for await (const rawInput of rl) {
       const input = rawInput.trim()
       if (!input) {
-        if (isInteractiveTerminal) rl.prompt()
         continue
       }
       if (input === '/exit') break
@@ -114,14 +115,12 @@ async function main(): Promise<void> {
           console.log(
             `\n${tools.list().map(tool => `${tool.name}: ${tool.description}`).join('\n')}\n`,
           )
-          if (isInteractiveTerminal) rl.prompt()
           continue
         }
 
         const localCommandResult = await tryHandleLocalCommand(input, { tools })
         if (localCommandResult !== null) {
           console.log(`\n${localCommandResult}\n`)
-          if (isInteractiveTerminal) rl.prompt()
           continue
         }
 
@@ -132,24 +131,16 @@ async function main(): Promise<void> {
           } else {
             console.log(`\n未识别命令。输入 /help 查看可用命令。\n`)
           }
-          if (isInteractiveTerminal) rl.prompt()
           continue
         }
       } catch (error) {
         console.log(
           `\n${error instanceof Error ? error.message : String(error)}\n`,
         )
-        if (isInteractiveTerminal) rl.prompt()
         continue
       }
 
-      messages[0] = {
-        role: 'system',
-        content: await buildSystemPrompt(process.cwd(), permissions.getSummary(), {
-          skills: tools.getSkills(),
-          mcpServers: tools.getMcpServers(),
-        }),
-      }
+      await refreshSystemPrompt()
       messages = [...messages, { role: 'user', content: input }]
       permissions.beginTurn()
       try {
@@ -157,7 +148,7 @@ async function main(): Promise<void> {
           model,
           tools,
           messages,
-          cwd: process.cwd(),
+          cwd,
           permissions,
         })
       } catch (error) {
@@ -181,8 +172,6 @@ async function main(): Promise<void> {
       if (lastAssistant?.role === 'assistant') {
         console.log(`\n${lastAssistant.content}\n`)
       }
-
-      if (isInteractiveTerminal) rl.prompt()
     }
 
     try {

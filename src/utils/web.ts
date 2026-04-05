@@ -1,3 +1,5 @@
+import { getErrorCode } from './errors.js'
+
 type SearchResult = {
   title: string
   link: string
@@ -15,29 +17,6 @@ const DEFAULT_MAX_RETRIES = 2
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, Math.max(0, ms)))
-}
-
-function getErrorCode(error: unknown): string | null {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof (error as { code?: unknown }).code === 'string'
-  ) {
-    return (error as { code: string }).code
-  }
-
-  if (
-    error instanceof Error &&
-    typeof error.cause === 'object' &&
-    error.cause !== null &&
-    'code' in error.cause &&
-    typeof (error.cause as { code?: unknown }).code === 'string'
-  ) {
-    return (error.cause as { code: string }).code
-  }
-
-  return null
 }
 
 function isRetryableStatus(status: number): boolean {

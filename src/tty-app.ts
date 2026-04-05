@@ -8,6 +8,7 @@ import {
 } from './cli-commands.js'
 import { loadHistoryEntries, saveHistoryEntries } from './history.js'
 import { parseLocalToolShortcut } from './local-tool-shortcuts.js'
+import { summarizeMcpServers } from './mcp-status.js'
 import {
   PermissionManager,
   PermissionPromptResult,
@@ -81,37 +82,15 @@ type TranscriptEntryDraft =
   | Omit<Extract<TranscriptEntry, { kind: 'tool' }>, 'id'>
 
 function getSessionStats(args: TtyAppArgs, state: ScreenState) {
-  const mcpServers = args.tools.getMcpServers()
-  const mcpConnectedCount = mcpServers.filter(
-    server => server.status === 'connected',
-  ).length
-  const mcpConnectingCount = mcpServers.filter(
-    server => server.status === 'connecting',
-  ).length
-  const mcpErrorCount = mcpServers.filter(server => server.status === 'error').length
+  const mcpStatus = summarizeMcpServers(args.tools.getMcpServers())
   return {
     transcriptCount: state.transcript.length,
     messageCount: args.messages.length,
     skillCount: args.tools.getSkills().length,
-    mcpTotalCount: mcpServers.length,
-    mcpConnectedCount,
-    mcpConnectingCount,
-    mcpErrorCount,
-  }
-}
-
-function getMcpStatus(args: TtyAppArgs): {
-  total: number
-  connected: number
-  connecting: number
-  error: number
-} {
-  const mcpServers = args.tools.getMcpServers()
-  return {
-    total: mcpServers.length,
-    connected: mcpServers.filter(server => server.status === 'connected').length,
-    connecting: mcpServers.filter(server => server.status === 'connecting').length,
-    error: mcpServers.filter(server => server.status === 'error').length,
+    mcpTotalCount: mcpStatus.total,
+    mcpConnectedCount: mcpStatus.connected,
+    mcpConnectingCount: mcpStatus.connecting,
+    mcpErrorCount: mcpStatus.error,
   }
 }
 
@@ -313,20 +292,6 @@ function updateToolEntry(
   entry.collapsePhase = undefined
 }
 
-function setToolEntryCollapsePhase(
-  state: ScreenState,
-  entryId: number,
-  phase: 1 | 2 | 3,
-): void {
-  const entry = state.transcript.find(
-    item => item.id === entryId && item.kind === 'tool',
-  )
-  if (!entry || entry.kind !== 'tool' || entry.status === 'running') {
-    return
-  }
-  entry.collapsePhase = phase
-}
-
 function collapseToolEntry(
   state: ScreenState,
   entryId: number,
@@ -381,26 +346,6 @@ function summarizeCollapsedToolBody(output: string): string {
     return `${line.slice(0, 140)}...`
   }
   return line
-}
-
-function scheduleToolAutoCollapse(
-  state: ScreenState,
-  entryId: number,
-  output: string,
-  rerender: () => void,
-): void {
-  const summary = summarizeCollapsedToolBody(output)
-  const frames: Array<1 | 2 | 3> = [1, 2]
-  frames.forEach((phase, idx) => {
-    setTimeout(() => {
-      setToolEntryCollapsePhase(state, entryId, phase)
-      rerender()
-    }, 110 * (idx + 1))
-  })
-  setTimeout(() => {
-    collapseToolEntry(state, entryId, summary)
-    rerender()
-  }, 320)
 }
 
 function truncateForDisplay(text: string, max = 180): string {
@@ -504,7 +449,7 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
         state.status,
         true,
         args.tools.getSkills().length > 0,
-        getMcpStatus(args),
+        summarizeMcpServers(args.tools.getMcpServers()),
         backgroundTasks,
       ),
     )
@@ -536,7 +481,7 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
       state.status,
       true,
       args.tools.getSkills().length > 0,
-      getMcpStatus(args),
+      summarizeMcpServers(args.tools.getMcpServers()),
       backgroundTasks,
     ),
   )

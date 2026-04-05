@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { isEnoentError } from './utils/errors.js'
 
 export type MiniCodeSettings = {
   env?: Record<string, string | number>
@@ -52,14 +53,7 @@ export async function readMcpTokensFile(
     }
     return parsed as Record<string, string>
   } catch (error) {
-    const code =
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      typeof error.code === 'string'
-        ? error.code
-        : ''
-    if (code === 'ENOENT') return {}
+    if (isEnoentError(error)) return {}
     throw error
   }
 }
@@ -77,15 +71,7 @@ async function readSettingsFile(filePath: string): Promise<MiniCodeSettings> {
     const content = await readFile(filePath, 'utf8')
     return JSON.parse(content) as MiniCodeSettings
   } catch (error) {
-    const code =
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      typeof error.code === 'string'
-        ? error.code
-        : ''
-
-    if (code === 'ENOENT') {
+    if (isEnoentError(error)) {
       return {}
     }
 
@@ -111,15 +97,7 @@ export async function readMcpConfigFile(
 
     return parsed.mcpServers as Record<string, McpServerConfig>
   } catch (error) {
-    const code =
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      typeof error.code === 'string'
-        ? error.code
-        : ''
-
-    if (code === 'ENOENT') {
+    if (isEnoentError(error)) {
       return {}
     }
 

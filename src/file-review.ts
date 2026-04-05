@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { createTwoFilesPatch } from 'diff'
 import type { ToolContext, ToolResult } from './tool.js'
+import { isEnoentError } from './utils/errors.js'
 
 export function buildUnifiedDiff(
   filePath: string,
@@ -34,15 +35,7 @@ export async function loadExistingFile(targetPath: string): Promise<string> {
   try {
     return await readFile(targetPath, 'utf8')
   } catch (error) {
-    const code =
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      typeof error.code === 'string'
-        ? error.code
-        : ''
-
-    if (code === 'ENOENT') {
+    if (isEnoentError(error)) {
       return ''
     }
 

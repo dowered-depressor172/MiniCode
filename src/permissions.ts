@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { MINI_CODE_DIR } from './config.js'
+import { isEnoentError } from './utils/errors.js'
 
 export type PermissionDecision =
   | 'allow_once'
@@ -139,15 +140,7 @@ async function readPermissionStore(): Promise<PermissionStore> {
     const content = await readFile(PERMISSIONS_PATH, 'utf8')
     return JSON.parse(content) as PermissionStore
   } catch (error) {
-    const code =
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      typeof error.code === 'string'
-        ? error.code
-        : ''
-
-    if (code === 'ENOENT') {
+    if (isEnoentError(error)) {
       return {}
     }
 

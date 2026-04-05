@@ -16,7 +16,6 @@ function hasPathEntry(target: string): boolean {
 }
 
 async function askRequired(
-  rl: readline.Interface,
   nextLine: () => Promise<string | null>,
   label: string,
   defaultValue?: string,
@@ -59,13 +58,11 @@ async function main(): Promise<void> {
     console.log('')
 
     const model = await askRequired(
-      rl,
       nextLine,
       'Model name',
       settings.model ? String(settings.model) : String(currentEnv.ANTHROPIC_MODEL ?? ''),
     )
     const baseUrl = await askRequired(
-      rl,
       nextLine,
       'ANTHROPIC_BASE_URL',
       String(currentEnv.ANTHROPIC_BASE_URL ?? 'https://api.anthropic.com'),

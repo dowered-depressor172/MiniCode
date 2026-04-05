@@ -1,5 +1,6 @@
 import process from 'node:process'
 import type { BackgroundTaskResult } from './tool.js'
+import { getErrorCode } from './utils/errors.js'
 
 type BackgroundTaskRecord = BackgroundTaskResult & {
   cwd: string
@@ -20,14 +21,7 @@ function refreshRecord(record: BackgroundTaskRecord): BackgroundTaskRecord {
     process.kill(record.pid, 0)
     return record
   } catch (error) {
-    const code =
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      typeof error.code === 'string'
-        ? error.code
-        : undefined
-
+    const code = getErrorCode(error)
     if (code === 'ESRCH') {
       const next = {
         ...record,
