@@ -31,40 +31,62 @@ export const webSearchTool: ToolDefinition<Input> = {
     },
     required: ['query'],
   },
-  schema: z.object({
-    query: z.string().min(1),
-    max_results: z.number().int().min(1).max(20).optional(),
-    allowed_domains: z.array(z.string().min(1)).optional(),
-    blocked_domains: z.array(z.string().min(1)).optional(),
-  }),
-  async run(input) {
-    const result = await searchDuckDuckGoLite({
-      query: input.query,
-      maxResults: input.max_results ?? 5,
-      allowedDomains: input.allowed_domains,
-      blockedDomains: input.blocked_domains,
+  schema: z
+    .object({
+      query: z.string().min(1),
+      max_results: z.number().int().min(1).max(20).optional(),
+      allowed_domains: z.array(z.string().min(1)).optional(),
+      blocked_domains: z.array(z.string().min(1)).optional(),
     })
+    .superRefine((value, ctx) => {
+      if (
+        (value.allowed_domains?.length ?? 0) > 0 &&
+        (value.blocked_domains?.length ?? 0) > 0
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message:
+            'Cannot specify both allowed_domains and blocked_domains in one request.',
+          path: ['allowed_domains'],
+        })
+      }
+    }),
+  async run(input) {
+    try {
+      const result = await searchDuckDuckGoLite({
+        query: input.query,
+        maxResults: input.max_results ?? 5,
+        allowedDomains: input.allowed_domains,
+        blockedDomains: input.blocked_domains,
+      })
 
-    if (result.organic.length === 0) {
+      if (result.organic.length === 0) {
+        return {
+          ok: true,
+          output: 'No results found.',
+        }
+      }
+
+      const lines: string[] = [`QUERY: ${input.query}`, '']
+      for (const [i, item] of result.organic.entries()) {
+        lines.push(`[${i + 1}] ${item.title}`)
+        lines.push(`    URL: ${item.link}`)
+        if (item.snippet) {
+          lines.push(`    ${item.snippet}`)
+        }
+        lines.push('')
+      }
+
       return {
         ok: true,
-        output: 'No results found.',
+        output: lines.join('\n').trimEnd(),
       }
-    }
-
-    const lines: string[] = [`QUERY: ${input.query}`, '']
-    for (const [i, item] of result.organic.entries()) {
-      lines.push(`[${i + 1}] ${item.title}`)
-      lines.push(`    URL: ${item.link}`)
-      if (item.snippet) {
-        lines.push(`    ${item.snippet}`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return {
+        ok: false,
+        output: `Web search failed: ${message}`,
       }
-      lines.push('')
-    }
-
-    return {
-      ok: true,
-      output: lines.join('\n').trimEnd(),
     }
   },
 }

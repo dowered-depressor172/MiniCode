@@ -27,29 +27,37 @@ export const webFetchTool: ToolDefinition<Input> = {
     max_chars: z.number().int().min(500).optional(),
   }),
   async run(input) {
-    const maxChars = input.max_chars ?? 12000
-    const result = await fetchWebPage({ url: input.url, maxChars })
+    try {
+      const maxChars = input.max_chars ?? 12000
+      const result = await fetchWebPage({ url: input.url, maxChars })
 
-    if (result.status >= 400) {
+      if (result.status >= 400) {
+        return {
+          ok: false,
+          output: `HTTP ${result.status} ${result.statusText}: ${input.url}`,
+        }
+      }
+
+      const lines: string[] = [
+        `URL: ${result.finalUrl}`,
+        `STATUS: ${result.status}`,
+        `CONTENT_TYPE: ${result.contentType}`,
+      ]
+      if (result.title) {
+        lines.push(`TITLE: ${result.title}`)
+      }
+      lines.push('', result.content)
+
+      return {
+        ok: true,
+        output: lines.join('\n'),
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
       return {
         ok: false,
-        output: `HTTP ${result.status} ${result.statusText}: ${input.url}`,
+        output: `Web fetch failed: ${message}`,
       }
-    }
-
-    const lines: string[] = [
-      `URL: ${result.finalUrl}`,
-      `STATUS: ${result.status}`,
-      `CONTENT_TYPE: ${result.contentType}`,
-    ]
-    if (result.title) {
-      lines.push(`TITLE: ${result.title}`)
-    }
-    lines.push('', result.content)
-
-    return {
-      ok: true,
-      output: lines.join('\n'),
     }
   },
 }

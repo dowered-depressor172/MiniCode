@@ -6,8 +6,146 @@ type SearchResult = {
   display_link: string
 }
 
+type SearchProvider = 'duckduckgo-lite' | 'sogou'
+
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 MiniCode/0.1'
+const DEFAULT_TIMEOUT_MS = 12000
+const DEFAULT_MAX_RETRIES = 2
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, Math.max(0, ms)))
+}
+
+function getErrorCode(error: unknown): string | null {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof (error as { code?: unknown }).code === 'string'
+  ) {
+    return (error as { code: string }).code
+  }
+
+  if (
+    error instanceof Error &&
+    typeof error.cause === 'object' &&
+    error.cause !== null &&
+    'code' in error.cause &&
+    typeof (error.cause as { code?: unknown }).code === 'string'
+  ) {
+    return (error.cause as { code: string }).code
+  }
+
+  return null
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || (status >= 500 && status < 600)
+}
+
+function isRetryableNetworkError(error: unknown): boolean {
+  const code = getErrorCode(error)
+  if (!code) {
+    return error instanceof Error && error.name === 'AbortError'
+  }
+
+  return (
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNRESET' ||
+    code === 'EAI_AGAIN' ||
+    code === 'ENOTFOUND' ||
+    code === 'ECONNREFUSED' ||
+    code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    code === 'UND_ERR_HEADERS_TIMEOUT' ||
+    code === 'UND_ERR_BODY_TIMEOUT'
+  )
+}
+
+function formatWebErrorMessage(args: {
+  url: string
+  error: unknown
+  timeoutMs: number
+}): string {
+  const code = getErrorCode(args.error)
+  if (code) {
+    return `request failed (${code}) for ${args.url}`
+  }
+
+  if (args.error instanceof Error && args.error.name === 'AbortError') {
+    return `request timed out after ${args.timeoutMs}ms for ${args.url}`
+  }
+
+  if (args.error instanceof Error && args.error.message) {
+    return `${args.error.message} (${args.url})`
+  }
+
+  return `request failed for ${args.url}`
+}
+
+async function fetchWithRetry(
+  url: string | URL,
+  init: RequestInit,
+  options?: {
+    timeoutMs?: number
+    maxRetries?: number
+  },
+): Promise<Response> {
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  const maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES
+  const target = typeof url === 'string' ? url : url.toString()
+
+  let lastError: unknown = null
+  let lastResponse: Response | null = null
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => {
+      controller.abort()
+    }, timeoutMs)
+
+    try {
+      const response = await fetch(url, {
+        ...init,
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+      lastResponse = response
+
+      if (isRetryableStatus(response.status) && attempt < maxRetries) {
+        await sleep(300 * Math.pow(2, attempt))
+        continue
+      }
+
+      return response
+    } catch (error) {
+      clearTimeout(timeout)
+      lastError = error
+      if (attempt < maxRetries && isRetryableNetworkError(error)) {
+        await sleep(300 * Math.pow(2, attempt))
+        continue
+      }
+      throw new Error(
+        formatWebErrorMessage({
+          url: target,
+          error,
+          timeoutMs,
+        }),
+      )
+    }
+  }
+
+  if (lastResponse) {
+    return lastResponse
+  }
+
+  throw new Error(
+    formatWebErrorMessage({
+      url: target,
+      error: lastError,
+      timeoutMs,
+    }),
+  )
+}
 
 export async function searchDuckDuckGoLite(options: {
   query: string
@@ -18,36 +156,53 @@ export async function searchDuckDuckGoLite(options: {
   organic: SearchResult[]
   base_resp: { status_code: number; status_msg: string; source: string }
 }> {
-  const url = new URL('https://lite.duckduckgo.com/lite/')
-  url.searchParams.set('q', options.query)
-
-  const response = await fetch(url, {
-    headers: {
-      'user-agent': USER_AGENT,
-      accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'accept-language': 'en-US,en;q=0.9',
-    },
-  })
-
-  if (!response.ok) {
-    throw new Error(`Search request failed with status ${response.status}`)
-  }
-
-  const html = await response.text()
   const allowed = normalizeDomainList(options.allowedDomains)
   const blocked = normalizeDomainList(options.blockedDomains)
   const maxResults = options.maxResults ?? 5
+  const errors: string[] = []
+  const providers: SearchProvider[] = ['duckduckgo-lite', 'sogou']
 
-  const organic = parseDuckDuckGoLite(html)
-    .filter((r) => passesDomainFilter(r.link, allowed, blocked))
-    .slice(0, maxResults)
+  for (const provider of providers) {
+    try {
+      const response = await fetchSearchPage(provider, options.query)
+      if (!response.ok) {
+        errors.push(`${provider}: HTTP ${response.status}`)
+        continue
+      }
+
+      const html = await response.text()
+      const parsed = parseSearchResults(provider, html)
+      const organic = parsed
+        .filter(r => passesDomainFilter(r.link, allowed, blocked))
+        .slice(0, maxResults)
+
+      if (organic.length > 0) {
+        return {
+          organic,
+          base_resp: {
+            status_code: response.status,
+            status_msg: response.statusText,
+            source: provider,
+          },
+        }
+      }
+
+      errors.push(`${provider}: no results`)
+    } catch (error) {
+      errors.push(`${provider}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`all search providers failed (${errors.join('; ')})`)
+  }
 
   return {
-    organic,
+    organic: [],
     base_resp: {
-      status_code: response.status,
-      status_msg: response.statusText,
-      source: 'duckduckgo-lite',
+      status_code: 200,
+      status_msg: 'OK',
+      source: 'fallback-empty',
     },
   }
 }
@@ -64,7 +219,7 @@ export async function fetchWebPage(options: {
   title: string | null
   content: string
 }> {
-  const response = await fetch(options.url, {
+  const requestInit: RequestInit = {
     headers: {
       'user-agent': USER_AGENT,
       accept:
@@ -72,11 +227,22 @@ export async function fetchWebPage(options: {
       'accept-language': 'en-US,en;q=0.9',
     },
     redirect: 'follow',
-  })
+  }
 
-  const text = await response.text()
-  const contentType = response.headers.get('content-type') ?? ''
-  const finalUrl = response.url || options.url
+  let response = await fetchWithRetry(options.url, requestInit)
+  let text = await response.text()
+  let contentType = response.headers.get('content-type') ?? ''
+  let finalUrl = response.url || options.url
+
+  if (contentType.includes('html')) {
+    const htmlRedirectUrl = extractHtmlRedirectUrl(text, finalUrl)
+    if (htmlRedirectUrl && htmlRedirectUrl !== finalUrl) {
+      response = await fetchWithRetry(htmlRedirectUrl, requestInit)
+      text = await response.text()
+      contentType = response.headers.get('content-type') ?? ''
+      finalUrl = response.url || htmlRedirectUrl
+    }
+  }
   const maxChars = options.maxChars ?? 12000
 
   if (contentType.includes('html')) {
@@ -102,26 +268,71 @@ export async function fetchWebPage(options: {
   }
 }
 
+function fetchSearchPage(provider: SearchProvider, query: string): Promise<Response> {
+  const headers: Record<string, string> = {
+    'user-agent': USER_AGENT,
+    accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  }
+
+  if (provider === 'duckduckgo-lite') {
+    const url = new URL('https://lite.duckduckgo.com/lite/')
+    url.searchParams.set('q', query)
+    headers['accept-language'] = 'en-US,en;q=0.9'
+    return fetchWithRetry(url, { headers })
+  }
+
+  if (provider === 'sogou') {
+    const url = new URL('https://www.sogou.com/web')
+    url.searchParams.set('query', query)
+    headers['accept-language'] = 'zh-CN,zh;q=0.9,en;q=0.6'
+    return fetchWithRetry(url, { headers })
+  }
+
+  throw new Error(`unsupported search provider: ${provider}`)
+}
+
+function parseSearchResults(provider: SearchProvider, html: string): SearchResult[] {
+  if (provider === 'duckduckgo-lite') {
+    return parseDuckDuckGoLite(html)
+  }
+
+  return parseSogouSearch(html)
+}
+
 function parseDuckDuckGoLite(html: string): SearchResult[] {
-  const linkPattern =
-    /<a rel="nofollow" href="([^"]+)" class='result-link'>([\s\S]*?)<\/a>/giu
-  const matches = [...html.matchAll(linkPattern)]
   const results: SearchResult[] = []
+  const anchorPattern = /<a\b[^>]*>[\s\S]*?<\/a>/giu
+  const matches = [...html.matchAll(anchorPattern)]
 
-  for (let i = 0; i < matches.length; i++) {
+  for (let i = 0; i < matches.length; i += 1) {
     const match = matches[i]
-    if (!match) continue
+    const anchorHtml = match?.[0] ?? ''
+    if (!anchorHtml) continue
 
+    const classValue = firstMatch(/class=(['"])([\s\S]*?)\1/iu, anchorHtml, 2) ?? ''
+    if (!/\bresult-link\b/i.test(classValue)) continue
+
+    const rawHref = firstMatch(/href=(['"])([\s\S]*?)\1/iu, anchorHtml, 2) ?? ''
+    const title = decodeHtml(stripTags(firstMatch(/<a\b[^>]*>([\s\S]*?)<\/a>/iu, anchorHtml) ?? ''))
     const nextMatch = matches[i + 1]
-    const block = html.slice(match.index ?? 0, nextMatch?.index ?? html.length)
-
-    const rawHref = match[1] ?? ''
-    const title = decodeHtml(stripTags(match[2] ?? ''))
+    const block = html.slice(match?.index ?? 0, nextMatch?.index ?? html.length)
     const snippet = decodeHtml(
-      stripTags(firstMatch(/<td class='result-snippet'>\s*([\s\S]*?)\s*<\/td>/iu, block) ?? ''),
+      stripTags(
+        firstMatch(
+          /<td[^>]*class=(['"])[^'"]*\bresult-snippet\b[^'"]*\1[^>]*>\s*([\s\S]*?)\s*<\/td>/iu,
+          block,
+          2,
+        ) ?? '',
+      ),
     )
     const displayLink = decodeHtml(
-      stripTags(firstMatch(/<span class='link-text'>([\s\S]*?)<\/span>/iu, block) ?? ''),
+      stripTags(
+        firstMatch(
+          /<span[^>]*class=(['"])[^'"]*\blink-text\b[^'"]*\1[^>]*>([\s\S]*?)<\/span>/iu,
+          block,
+          2,
+        ) ?? '',
+      ),
     )
     const link = normalizeDuckDuckGoLink(rawHref)
 
@@ -132,8 +343,68 @@ function parseDuckDuckGoLite(html: string): SearchResult[] {
   return results
 }
 
+function parseSogouSearch(html: string): SearchResult[] {
+  const h3Pattern = /<h3\b[^>]*>\s*([\s\S]*?)<\/h3>/giu
+  const matches = [...html.matchAll(h3Pattern)]
+  const results: SearchResult[] = []
+
+  for (let i = 0; i < matches.length; i += 1) {
+    const match = matches[i]
+    if (!match) continue
+
+    const h3Html = match[0]
+    const rawHref = decodeHtml(firstMatch(/href=(['"])([\s\S]*?)\1/iu, h3Html, 2) ?? '')
+    const title = decodeHtml(
+      stripTags(firstMatch(/<a\b[^>]*>([\s\S]*?)<\/a>/iu, h3Html, 1) ?? ''),
+    )
+    const link = normalizeSogouLink(rawHref)
+
+    if (!title || !link) continue
+
+    const next = matches[i + 1]
+    const block = html.slice(match.index ?? 0, next?.index ?? html.length)
+    const snippet = decodeHtml(
+      stripTags(
+        firstMatch(
+          /<(div|p)\b[^>]*class=(['"])[^'"]*(fz-mid|str-text-info|text-layout|space-txt)[^'"]*\2[^>]*>([\s\S]*?)<\/\1>/iu,
+          block,
+          4,
+        ) ?? '',
+      ),
+    )
+
+    let displayLink = ''
+    try {
+      displayLink = new URL(link).hostname
+    } catch {
+      displayLink = link
+    }
+
+    results.push({
+      title,
+      link,
+      snippet,
+      date: '',
+      display_link: displayLink,
+    })
+  }
+
+  return results
+}
+
 function normalizeDomainList(domains: string[] | undefined): string[] {
-  return (domains ?? []).map((d) => d.trim().toLowerCase()).filter(Boolean)
+  return (domains ?? [])
+    .map((d) => {
+      const raw = d.trim().toLowerCase()
+      if (!raw) return ''
+      const withoutWildcard = raw.replace(/^\*\./, '').replace(/^\./, '')
+      try {
+        return new URL(withoutWildcard).hostname.toLowerCase()
+      } catch {
+        return withoutWildcard
+      }
+    })
+    .filter(Boolean)
 }
 
 function passesDomainFilter(
@@ -156,8 +427,8 @@ function matchesDomain(host: string, domain: string): boolean {
   return host === domain || host.endsWith(`.${domain}`)
 }
 
-function firstMatch(pattern: RegExp, text: string): string | null {
-  return text.match(pattern)?.[1] ?? null
+function firstMatch(pattern: RegExp, text: string, group: number = 1): string | null {
+  return text.match(pattern)?.[group] ?? null
 }
 
 function normalizeDuckDuckGoLink(rawHref: string): string {
@@ -170,6 +441,53 @@ function normalizeDuckDuckGoLink(rawHref: string): string {
     return redirect ? decodeURIComponent(redirect) : url.toString()
   } catch {
     return absolute
+  }
+}
+
+function normalizeSogouLink(rawHref: string): string {
+  if (!rawHref) return ''
+  const href = decodeHtml(rawHref).trim()
+  if (!href) return ''
+  if (href.startsWith('/')) {
+    return `https://www.sogou.com${href}`
+  }
+  if (href.startsWith('//')) {
+    return `https:${href}`
+  }
+  return href
+}
+
+function extractHtmlRedirectUrl(html: string, baseUrl: string): string | null {
+  const scriptRedirect =
+    firstMatch(
+      /window\.location(?:\.href)?(?:\.replace)?\((['"])(.*?)\1\)/iu,
+      html,
+      2,
+    ) ??
+    firstMatch(
+      /window\.location(?:\.href)?\s*=\s*(['"])(.*?)\1/iu,
+      html,
+      2,
+    )
+  const metaRefresh =
+    firstMatch(
+      /<meta[^>]*http-equiv=(['"])refresh\1[^>]*content=(['"])[\s\S]*?url\s*=\s*('?)([^"'>;]+)\3[\s\S]*?\2[^>]*>/iu,
+      html,
+      4,
+    ) ??
+    firstMatch(
+      /<meta[^>]*content=(['"])[\s\S]*?url\s*=\s*('?)([^"'>;]+)\2[\s\S]*?\1[^>]*http-equiv=(['"])refresh\4[^>]*>/iu,
+      html,
+      3,
+    )
+
+  const raw = decodeHtml((scriptRedirect ?? metaRefresh ?? '').trim())
+  if (!raw) return null
+
+  try {
+    return new URL(raw, baseUrl).toString()
+  } catch {
+    return null
   }
 }
 
