@@ -156,9 +156,23 @@ Configuration is stored in:
 - `~/.mini-code/settings.json`
 - `~/.mini-code/mcp.json`
 
+You can override the config directory with `MINI_CODE_HOME`:
+
+```bash
+export MINI_CODE_HOME=/path/to/custom/dir
+npm run install-local
+```
+
 The launcher is installed to:
 
 - `~/.local/bin/minicode`
+
+You can override the launcher directory with `MINI_CODE_BIN_DIR`:
+
+```bash
+export MINI_CODE_BIN_DIR=/path/to/custom/bin
+npm run install-local
+```
 
 If `~/.local/bin` is not already on your `PATH`, add:
 

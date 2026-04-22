@@ -155,9 +155,23 @@ npm run install-local
 - `~/.mini-code/settings.json`
 - `~/.mini-code/mcp.json`
 
+你可以通过 `MINI_CODE_HOME` 自定义配置目录：
+
+```bash
+export MINI_CODE_HOME=/path/to/custom/dir
+npm run install-local
+```
+
 启动命令安装到：
 
 - `~/.local/bin/minicode`
+
+你可以通过 `MINI_CODE_BIN_DIR` 自定义启动器目录：
+
+```bash
+export MINI_CODE_BIN_DIR=/path/to/custom/bin
+npm run install-local
+```
 
 如果 `~/.local/bin` 不在你的 `PATH` 中，可以添加：
 
