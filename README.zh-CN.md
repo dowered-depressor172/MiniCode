@@ -135,6 +135,8 @@ MiniCode 围绕一个实用的 terminal-first agent loop 构建：
 - 加固 ESC 序列解析，异常终端输入不会再卡住按键处理
 - `run_command` 支持 `"git status"` 这类单字符串命令输入，并自动拆分参数
 - 澄清问题改为通过 `ask_user` 结构化发问，并在用户回复前暂停当前回合
+- 上下文 token 记账已改为 provider usage 驱动：供应商返回的 usage 会作为 context stats、自动压缩触发、warning/blocking 级别和 TUI context badge 的主要来源；本地估算器只在 provider 未返回 usage 或最新 usage boundary 之后存在新增消息时作为 fallback/tail estimate
+- TUI context badge 会区分真实 usage 和估算 tail，例如 `ctx 82% ... usage+est`；压缩后的会话会把保留下来的旧 usage 标记为 stale，避免把压缩前的 usage 当作当前上下文真实值
 
 ## 安装
 

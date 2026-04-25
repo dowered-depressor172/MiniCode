@@ -47,6 +47,21 @@ describe('renderContextBadge', () => {
     assert.ok(plain.includes('100%'))
   })
 
+  it('shows provider usage plus estimate source', () => {
+    const result = renderContextBadge({
+      utilization: 0.82,
+      warningLevel: 'warning',
+      accounting: {
+        providerUsageTokens: 70_000,
+        estimatedTokens: 12_000,
+        source: 'provider_usage_plus_estimate',
+      },
+    })
+    const plain = stripAnsi(result)
+    assert.ok(plain.includes('82%'))
+    assert.ok(plain.includes('usage+est'))
+  })
+
   it('uses correct block characters for utilization', () => {
     const result = renderContextBadge({ utilization: 0.5, warningLevel: 'warning' })
     const plain = stripAnsi(result)

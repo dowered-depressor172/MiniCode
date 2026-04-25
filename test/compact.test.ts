@@ -134,6 +134,35 @@ describe('compactConversation', () => {
       }
     }
   })
+
+  it('marks retained provider usage stale after compaction', async () => {
+    const messages = makeConversation(10)
+    const last = messages[messages.length - 1]
+    if (last.role === 'tool_result') {
+      messages.splice(messages.length - 2, 0, {
+        role: 'assistant',
+        content: 'Recent answer with provider usage',
+        providerUsage: {
+          inputTokens: 10_000,
+          outputTokens: 100,
+          totalTokens: 10_100,
+          source: 'test',
+        },
+      })
+    }
+    const adapter = createMockModelAdapter('<summary>Summary</summary>')
+    const result = await compactConversation(messages, adapter)
+
+    assert.notEqual(result, null)
+    const retainedUsage = result!.messages.find(
+      m => m.role === 'assistant' && m.providerUsage,
+    )
+    assert.ok(retainedUsage)
+    assert.equal(
+      retainedUsage!.role === 'assistant' ? retainedUsage!.usageStale : false,
+      true,
+    )
+  })
 })
 
 describe('groupMessagesByApiRound', () => {

@@ -50,6 +50,8 @@ In other words, MiniCode is a smaller, more controllable terminal coding assista
 - `src/background-tasks.ts`: minimal background shell task registry used by `run_command` and the TUI
 - `src/manage-cli.ts`: manages persisted MCP configs and installed local skills
 - `src/anthropic-adapter.ts`: Anthropic-compatible Messages API adapter
+- `src/utils/token-estimator.ts`: structured token accounting. Provider-reported usage is the primary source when available; local estimation is reserved for missing usage and for tail messages after the latest provider usage boundary.
+- `src/compact/*`: context compression and auto-compact. Auto-compact uses structured accounting totals, and compaction marks retained pre-compact provider usage stale.
 - `src/mock-model.ts`: offline fallback adapter
 - `src/permissions.ts`: path, command, and edit approval with allowlist / denylist
 - `src/session.ts`: multi-session persistence with append-only JSONL, parentUuid tree structure, compact boundary, session forking, and expiry cleanup

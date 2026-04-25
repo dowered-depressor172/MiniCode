@@ -1,5 +1,5 @@
 import type { ToolRegistry } from './tool.js'
-import type { ChatMessage, ModelAdapter, StepDiagnostics, ToolCall } from './types.js'
+import type { ChatMessage, ModelAdapter, ProviderUsage, StepDiagnostics, ToolCall } from './types.js'
 import type { RuntimeConfig } from './config.js'
 import { resolveMaxOutputTokens } from './utils/context.js'
 
@@ -16,6 +16,13 @@ type AnthropicContentBlock =
 type AnthropicMessage = {
   role: 'user' | 'assistant'
   content: AnthropicContentBlock[]
+}
+
+type AnthropicUsage = {
+  input_tokens?: number
+  output_tokens?: number
+  cache_creation_input_tokens?: number
+  cache_read_input_tokens?: number
 }
 
 function sleep(ms: number): Promise<void> {
@@ -171,6 +178,23 @@ function toTextBlock(text: string): AnthropicContentBlock {
   return { type: 'text', text }
 }
 
+function normalizeAnthropicUsage(usage: AnthropicUsage | undefined): ProviderUsage | undefined {
+  if (!usage) return undefined
+  const inputTokens =
+    (usage.input_tokens ?? 0) +
+    (usage.cache_creation_input_tokens ?? 0) +
+    (usage.cache_read_input_tokens ?? 0)
+  const outputTokens = usage.output_tokens ?? 0
+  const totalTokens = inputTokens + outputTokens
+  if (totalTokens <= 0) return undefined
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    source: 'anthropic',
+  }
+}
+
 function toAssistantText(message: Extract<ChatMessage, {
   role: 'assistant' | 'assistant_progress'
 }>): string {
@@ -314,6 +338,7 @@ export class AnthropicModelAdapter implements ModelAdapter {
     const data = (await readJsonBody(response)) as {
       stop_reason?: string
       content?: AnthropicContentBlock[]
+      usage?: AnthropicUsage
       error?: { message?: string }
     }
 
@@ -352,6 +377,7 @@ export class AnthropicModelAdapter implements ModelAdapter {
       blockTypes,
       ignoredBlockTypes: [...ignoredBlockTypes],
     }
+    const usage = normalizeAnthropicUsage(data.usage)
 
     if (toolCalls.length > 0) {
       return {
@@ -363,6 +389,7 @@ export class AnthropicModelAdapter implements ModelAdapter {
             ? ('progress' as const)
             : undefined,
         diagnostics,
+        usage,
       }
     }
 
@@ -371,6 +398,7 @@ export class AnthropicModelAdapter implements ModelAdapter {
       content: parsedText.content,
       kind: parsedText.kind,
       diagnostics,
+      usage,
     }
   }
 }

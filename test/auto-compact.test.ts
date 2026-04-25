@@ -1,7 +1,12 @@
 import { describe, it, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ChatMessage, ModelAdapter, AgentStep } from '../src/types.js'
-import { autoCompact, resetAutoCompactState, getAutoCompactState } from '../src/compact/auto-compact.js'
+import {
+  autoCompact,
+  resetAutoCompactState,
+  getAutoCompactState,
+  shouldAutoCompact,
+} from '../src/compact/auto-compact.js'
 
 function createMockModelAdapter(response: string): ModelAdapter {
   return {
@@ -126,5 +131,42 @@ describe('autoCompact', () => {
     const afterReset = getAutoCompactState()
     assert.equal(afterReset.consecutiveFailures, 0)
     assert.equal(afterReset.disabled, false)
+  })
+
+  it('shouldAutoCompact uses provider usage totalTokens', () => {
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'System' },
+      {
+        role: 'assistant',
+        content: 'Provider counted a large context',
+        providerUsage: {
+          inputTokens: 110_000,
+          outputTokens: 1_000,
+          totalTokens: 111_000,
+          source: 'test',
+        },
+      },
+    ]
+
+    assert.equal(shouldAutoCompact(messages, 'deepseek-chat'), true)
+  })
+
+  it('shouldAutoCompact includes estimated tail after provider usage', () => {
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'System' },
+      {
+        role: 'assistant',
+        content: 'Provider counted most of the context',
+        providerUsage: {
+          inputTokens: 100_000,
+          outputTokens: 1_000,
+          totalTokens: 101_000,
+          source: 'test',
+        },
+      },
+      { role: 'user', content: 'x'.repeat(60_000) },
+    ]
+
+    assert.equal(shouldAutoCompact(messages, 'deepseek-chat'), true)
   })
 })
