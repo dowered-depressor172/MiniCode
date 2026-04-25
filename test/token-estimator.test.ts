@@ -5,6 +5,7 @@ import {
   estimateMessageTokens,
   estimateMessagesTokens,
   computeContextStats,
+  tokenCountWithEstimation,
 } from '../src/utils/token-estimator.js'
 
 describe('estimateMessageTokens', () => {
@@ -132,5 +133,101 @@ describe('computeContextStats', () => {
     ]
     const stats = computeContextStats(messages, 'deepseek-chat')
     assert.equal(stats.utilization, 1)
+  })
+})
+
+describe('tokenCountWithEstimation', () => {
+  it('uses provider usage when the latest provider boundary matches current messages', () => {
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'System' },
+      { role: 'user', content: 'Hello' },
+      {
+        role: 'assistant',
+        content: 'Hi',
+        providerUsage: {
+          inputTokens: 100,
+          outputTokens: 25,
+          totalTokens: 125,
+          source: 'test',
+        },
+      },
+    ]
+
+    const result = tokenCountWithEstimation(messages)
+    assert.equal(result.source, 'provider_usage')
+    assert.equal(result.providerUsageTokens, 125)
+    assert.equal(result.estimatedTokens, 0)
+    assert.equal(result.totalTokens, 125)
+    assert.equal(result.isExact, true)
+  })
+
+  it('uses provider usage plus estimator only for messages after the usage boundary', () => {
+    const tail: ChatMessage = { role: 'user', content: 'x'.repeat(300) }
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'System' },
+      {
+        role: 'assistant',
+        content: 'Previous answer',
+        providerUsage: {
+          inputTokens: 700,
+          outputTokens: 100,
+          totalTokens: 800,
+          source: 'test',
+        },
+      },
+      tail,
+    ]
+
+    const tailEstimate = estimateMessagesTokens([tail])
+    const result = tokenCountWithEstimation(messages)
+    assert.equal(result.source, 'provider_usage_plus_estimate')
+    assert.equal(result.providerUsageTokens, 800)
+    assert.equal(result.estimatedTokens, tailEstimate)
+    assert.equal(result.totalTokens, 800 + tailEstimate)
+    assert.equal(result.isExact, false)
+  })
+
+  it('falls back to estimate_only when no provider usage is available', () => {
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'System' },
+      { role: 'user', content: 'Hello' },
+    ]
+
+    const result = tokenCountWithEstimation(messages)
+    assert.equal(result.source, 'estimate_only')
+    assert.equal(result.providerUsageTokens, 0)
+    assert.equal(result.estimatedTokens, estimateMessagesTokens(messages))
+    assert.equal(result.totalTokens, estimateMessagesTokens(messages))
+    assert.equal(result.isExact, false)
+  })
+
+  it('ignores stale provider usage after compact-style message transforms', () => {
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'System' },
+      {
+        role: 'context_summary',
+        content: 'Earlier conversation summary',
+        compressedCount: 8,
+        timestamp: Date.now(),
+      },
+      {
+        role: 'assistant',
+        content: 'Old retained answer',
+        providerUsage: {
+          inputTokens: 1000,
+          outputTokens: 50,
+          totalTokens: 1050,
+          source: 'test',
+        },
+        usageStale: true,
+        usageStaleReason: 'conversation was compacted after this provider usage was recorded',
+      },
+    ]
+
+    const result = tokenCountWithEstimation(messages)
+    assert.equal(result.source, 'estimate_only')
+    assert.equal(result.stale, true)
+    assert.match(result.reason ?? '', /compacted/)
+    assert.notEqual(result.totalTokens, 1050)
   })
 })

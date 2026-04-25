@@ -52,6 +52,8 @@ MiniCode 优先保留这些能力：
 - `src/background-tasks.ts`: 给 `run_command` 和 TUI 使用的最小 background shell task 注册表
 - `src/manage-cli.ts`: 管理持久化 MCP 配置和本地安装的 skills
 - `src/anthropic-adapter.ts`: Anthropic 兼容 Messages API 适配器
+- `src/utils/token-estimator.ts`: 结构化 token accounting。provider-reported usage 可用时作为主数据源；本地估算只用于缺失 usage 的 fallback，以及最新 provider usage boundary 之后的 tail messages。
+- `src/compact/*`: 上下文压缩与自动压缩。auto-compact 使用结构化 accounting total；compact 后会把保留下来的压缩前 provider usage 标记为 stale。
 - `src/mock-model.ts`: 离线回退适配器
 - `src/permissions.ts`: 路径、命令、编辑审批与 allowlist / denylist
 - `src/file-review.ts`: 写文件前 diff review

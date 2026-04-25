@@ -10,16 +10,18 @@ Pull requests are welcome, especially when they align with the contribution guid
 
 ### 1. Model-aware context management
 
-**Status: in progress.**
+**Status: mostly implemented; follow-up polish remains.**
 
 This is the most important missing runtime capability.
 
 It includes:
 
 - model-aware context window configuration
-- provider-reported usage accounting
-- context usage display in the TUI
-- automatic context compaction for long conversations
+- provider-reported usage accounting as the primary token source
+- context usage display in the TUI, including whether the value is provider usage, usage plus estimated tail, or estimate-only fallback
+- automatic context compaction for long conversations, triggered from structured accounting totals instead of a bare local estimate
+
+MiniCode now records provider usage on assistant response boundaries and computes context stats from a structured accounting result. The local estimator remains available for providers that do not return usage, offline tests, and tail messages appended after the latest provider usage boundary. Compaction marks retained pre-compact usage stale so the next context calculation does not treat an old response's usage as the current conversation total.
 
 This work matters because long-session stability depends on it. It is also one of the most important design areas where MiniCode still trails a more complete Claude Code-style runtime.
 

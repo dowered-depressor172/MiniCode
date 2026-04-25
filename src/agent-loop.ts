@@ -1,12 +1,34 @@
 import type { ToolRegistry } from './tool.js'
-import type { ChatMessage, CompressionResult, ModelAdapter } from './types.js'
+import type { ChatMessage, CompressionResult, ModelAdapter, ProviderUsage } from './types.js'
 import type { PermissionManager } from './permissions.js'
 import { microcompact } from './compact/microcompact.js'
 import { autoCompact } from './compact/auto-compact.js'
 import { computeContextStats } from './utils/token-estimator.js'
+import {
+  applyToolResultBudget,
+  createContentReplacementState,
+  replaceLargeToolResult,
+  type ContentReplacementState,
+  type PendingToolResult,
+} from './utils/tool-result-storage.js'
 
 function isEmptyAssistantResponse(content: string): boolean {
   return content.trim().length === 0
+}
+
+function withProviderUsage<T extends ChatMessage>(
+  message: T,
+  usage: ProviderUsage | undefined,
+): T {
+  if (!usage) return message
+  if (
+    message.role === 'assistant' ||
+    message.role === 'assistant_progress' ||
+    message.role === 'assistant_tool_call'
+  ) {
+    return { ...message, providerUsage: usage } as T
+  }
+  return message
 }
 
 function shouldTreatAssistantAsProgress(args: {
@@ -81,6 +103,7 @@ export async function runAgentTurn(args: {
   onProgressMessage?: (content: string) => void
   onAutoCompact?: (result: CompressionResult) => void
   onContextStats?: (stats: import('./utils/token-estimator.js').ContextStats) => void
+  contentReplacementState?: ContentReplacementState
 }): Promise<ChatMessage[]> {
   const maxSteps = args.maxSteps
   const modelName = args.modelName ?? ''
@@ -89,6 +112,8 @@ export async function runAgentTurn(args: {
   let recoverableThinkingRetryCount = 0
   let toolErrorCount = 0
   let sawToolResultThisTurn = false
+  const contentReplacementState =
+    args.contentReplacementState ?? createContentReplacementState()
 
   const pushContinuationPrompt = (content: string) => {
     messages = [
@@ -212,7 +237,7 @@ export async function runAgentTurn(args: {
       }
       const withAssistant: ChatMessage[] = [
         ...messages,
-        assistantMessage,
+        withProviderUsage(assistantMessage, next.usage),
       ]
 
       if (!isEmpty) {
@@ -227,7 +252,7 @@ export async function runAgentTurn(args: {
         args.onProgressMessage?.(next.content)
         messages = [
           ...messages,
-          { role: 'assistant_progress', content: next.content },
+          withProviderUsage({ role: 'assistant_progress', content: next.content }, next.usage),
         ]
         pushContinuationPrompt(
           'Continue immediately from your <progress> update with concrete tool calls, code changes, or an explicit <final> answer only if the task is complete.',
@@ -236,7 +261,10 @@ export async function runAgentTurn(args: {
         args.onAssistantMessage?.(next.content)
         messages = [
           ...messages,
-          { role: 'assistant', content: next.content },
+          withProviderUsage(
+            { role: 'assistant', content: next.content },
+            (next.calls?.length ?? 0) > 0 ? undefined : next.usage,
+          ),
         ]
       }
     }
@@ -244,6 +272,12 @@ export async function runAgentTurn(args: {
     if ((next.calls?.length ?? 0) === 0 && next.content && next.contentKind !== 'progress') {
       return messages
     }
+
+    const executedToolResults: Array<{
+      call: (typeof next.calls)[number]
+      result: Awaited<ReturnType<ToolRegistry['execute']>>
+      toolResult: PendingToolResult
+    }> = []
 
     for (const call of next.calls) {
       args.onToolStart?.(call.toolName, call.input)
@@ -258,25 +292,50 @@ export async function runAgentTurn(args: {
       }
       args.onToolResult?.(call.toolName, result.output, !result.ok)
 
+      const toolResult = await replaceLargeToolResult({
+        role: 'tool_result',
+        toolUseId: call.id,
+        toolName: call.toolName,
+        content: result.output,
+        isError: !result.ok,
+      }, contentReplacementState)
+
+      executedToolResults.push({
+        call,
+        result,
+        toolResult,
+      })
+    }
+
+    const budgetedResults = await applyToolResultBudget(
+      executedToolResults.map(entry => entry.toolResult),
+      contentReplacementState,
+    )
+    const toolResultById = new Map(
+      budgetedResults.results.map(result => [result.toolUseId, result]),
+    )
+
+    for (let i = 0; i < executedToolResults.length; i++) {
+      const entry = executedToolResults[i]
+      const toolResult = toolResultById.get(entry.call.id) ?? entry.toolResult
+      const toolCallMessage: ChatMessage = {
+        role: 'assistant_tool_call',
+        toolUseId: entry.call.id,
+        toolName: entry.call.toolName,
+        input: entry.call.input,
+      }
+
       messages = [
         ...messages,
-        {
-          role: 'assistant_tool_call',
-          toolUseId: call.id,
-          toolName: call.toolName,
-          input: call.input,
-        },
-        {
-          role: 'tool_result',
-          toolUseId: call.id,
-          toolName: call.toolName,
-          content: result.output,
-          isError: !result.ok,
-        },
+        withProviderUsage(
+          toolCallMessage,
+          i === executedToolResults.length - 1 ? next.usage : undefined,
+        ),
+        toolResult,
       ]
 
-      if (result.awaitUser) {
-        const question = result.output.trim()
+      if (entry.result.awaitUser) {
+        const question = entry.result.output.trim()
         if (question.length > 0) {
           args.onAssistantMessage?.(question)
           messages = [

@@ -15,6 +15,12 @@ const state: AutoCompactState = {
   disabled: false,
 }
 
+function debugAutoCompact(message: string): void {
+  if (process.env.MINI_CODE_DEBUG_AUTOCOMPACT === '1') {
+    console.error(`[auto-compact] ${message}`)
+  }
+}
+
 export function resetAutoCompactState(): void {
   state.consecutiveFailures = 0
   state.disabled = false
@@ -22,6 +28,18 @@ export function resetAutoCompactState(): void {
 
 export function getAutoCompactState(): Readonly<AutoCompactState> {
   return { ...state }
+}
+
+export function shouldAutoCompact(messages: ChatMessage[], model: string): boolean {
+  const stats = computeContextStats(messages, model)
+  const shouldCompact = stats.utilization >= THRESHOLDS.AUTOCOMPACT_UTILIZATION
+  debugAutoCompact(
+    `source=${stats.accounting.source} total=${stats.accounting.totalTokens} ` +
+      `provider=${stats.accounting.providerUsageTokens} estimate=${stats.accounting.estimatedTokens} ` +
+      `utilization=${stats.utilization.toFixed(3)} threshold=${THRESHOLDS.AUTOCOMPACT_UTILIZATION} ` +
+      `should=${shouldCompact}`,
+  )
+  return shouldCompact
 }
 
 export async function autoCompact(
@@ -38,8 +56,7 @@ export async function autoCompact(
     return null
   }
 
-  const stats = computeContextStats(messages, model)
-  if (stats.utilization < THRESHOLDS.AUTOCOMPACT_UTILIZATION) {
+  if (!shouldAutoCompact(messages, model)) {
     return null
   }
 

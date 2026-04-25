@@ -136,6 +136,8 @@ MiniCode is a good fit if you want:
 - escape-sequence parsing is hardened so malformed terminal input does not stall key handling
 - `run_command` now accepts single-string invocations like `"git status"` and auto-splits args
 - clarifying questions are now structured via `ask_user`, and the turn pauses until the user replies
+- context accounting is now provider-usage-driven: provider-reported usage anchors the context stats, auto-compact trigger, blocking/warning levels, and TUI context badge; the local estimator is used only when provider usage is unavailable or for messages added after the latest usage boundary
+- the TUI context badge distinguishes exact provider usage from estimated tail text, for example `ctx 82% ... usage+est`; compacted conversations mark retained pre-compact usage stale so it is not reused as current context truth
 
 ## Installation
 

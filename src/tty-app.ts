@@ -41,6 +41,10 @@ import type { ChatMessage, CompressionResult, ModelAdapter } from './types.js'
 import type { ContextStats } from './utils/token-estimator.js'
 import { computeContextStats } from './utils/token-estimator.js'
 import { manualCompact } from './compact/manual-compact.js'
+import {
+  createContentReplacementState,
+  type ContentReplacementState,
+} from './utils/tool-result-storage.js'
 
 type TtyAppArgs = {
   runtime: RuntimeConfig | null
@@ -49,6 +53,7 @@ type TtyAppArgs = {
   messages: ChatMessage[]
   cwd: string
   permissions: PermissionManager
+  contentReplacementState?: ContentReplacementState
 }
 
 type PendingApproval = {
@@ -712,6 +717,7 @@ async function handleInput(
       cwd: args.cwd,
       permissions: args.permissions,
       modelName: args.runtime?.model ?? '',
+      contentReplacementState: args.contentReplacementState,
       onContextStats(stats) {
         state.contextStats = stats
         rerender()
@@ -944,6 +950,8 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
 
   const permissionArgs: TtyAppArgs = {
     ...args,
+    contentReplacementState:
+      args.contentReplacementState ?? createContentReplacementState(),
     permissions: new PermissionManager(
       args.cwd,
       createPermissionPromptHandler(state, () => renderScreen(permissionArgs, state)),
